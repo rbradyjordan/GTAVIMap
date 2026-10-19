@@ -14,6 +14,8 @@ export type Blip = {
   what: string;
   dates?: string;
   image?: string;
+  /** More photos shown behind the "see more" tile */
+  images?: string[];
   imageCredit?: string;
   link?: string;
   source?: string;
@@ -106,6 +108,7 @@ export const DEFAULT_BLIPS: Blip[] = [
     what: "Panther Coffee got the launch treatment: the yellow panther on the front wall now wears pink shades, and the window carries the VI palm-tree mark. It's two blocks south of Wynwood Walls, so pair it with the mural hunt. Grab a cortadito and shoot the wall from across NW 2nd Ave; the morning sun hits it straight on.",
     dates: "Seen Oct 19",
     image: "/photos/panther-coffee.jpg",
+    images: ["/photos/panther-coffee-window.jpg", "/photos/panther-coffee-panther.jpg"],
     imageCredit: "Photo: Brady, Oct 19.",
     link: "https://www.panthercoffee.com",
     source: "Seen in person",

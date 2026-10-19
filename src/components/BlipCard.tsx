@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Blip, CATEGORIES } from "@/data/blips";
+import Gallery from "./Gallery";
 
 type Props = {
   blip: Blip;
@@ -13,9 +14,15 @@ type Props = {
 
 export default function BlipCard({ blip, onClose, onEdit, onDelete, editor }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [gallery, setGallery] = useState<number | null>(null);
   const cat = CATEGORIES[blip.cat];
+  const photos = [blip.image, ...(blip.images ?? [])].filter((p): p is string => Boolean(p));
+  const extra = photos.length - 1;
 
-  useEffect(() => setConfirmDelete(false), [blip.id]);
+  useEffect(() => {
+    setConfirmDelete(false);
+    setGallery(null);
+  }, [blip.id]);
 
   const appleUrl = `https://maps.apple.com/?q=${encodeURIComponent(blip.name)}&ll=${blip.lat},${blip.lng}`;
   const dirUrl = `https://maps.apple.com/?daddr=${blip.lat},${blip.lng}&dirflg=d`;
@@ -23,11 +30,24 @@ export default function BlipCard({ blip, onClose, onEdit, onDelete, editor }: Pr
   return (
     <aside className="card" style={{ ["--c" as string]: cat.color }} aria-label={blip.name}>
       <div className="scroll">
-        <div className="hero">
-          {blip.image ? (
-            <img src={blip.image} alt="" />
-          ) : (
+        <div className={`hero${extra > 0 ? " multi" : ""}`}>
+          {photos.length === 0 ? (
             <div className="nophoto">{editor ? "No photo yet · Edit to add one" : "No photo yet"}</div>
+          ) : (
+            <>
+              <button className="banner" onClick={() => setGallery(0)} aria-label="Open photos">
+                <img src={photos[0]} alt="" />
+              </button>
+              {extra > 0 && (
+                <button className="more" onClick={() => setGallery(1)} aria-label={`See ${extra} more photo${extra === 1 ? "" : "s"}`}>
+                  <img src={photos[1]} alt="" />
+                  <span className="more-label">
+                    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 4h6v2H6v4H4zm10 0h6v6h-2V6h-4zM4 14h2v4h4v2H4zm14 0h2v6h-6v-2h4z" fill="currentColor"/></svg>
+                    +{extra}
+                  </span>
+                </button>
+              )}
+            </>
           )}
           <span className="badge">{cat.label}</span>
           <button className="close" onClick={onClose} aria-label="Close">
@@ -102,6 +122,7 @@ export default function BlipCard({ blip, onClose, onEdit, onDelete, editor }: Pr
           {blip.imageCredit && <div className="credit">{blip.imageCredit}</div>}
         </div>
       </div>
+      {gallery !== null && <Gallery photos={photos} start={gallery} title={blip.name} onClose={() => setGallery(null)} />}
     </aside>
   );
 }

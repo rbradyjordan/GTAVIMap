@@ -409,3 +409,45 @@ img { max-width: 100%; display: block; }
 .filter { padding: 7px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); color: var(--fg); }
 .filter::placeholder { color: var(--muted); }
 .toast.warn { background: #ff8da6; color: #2a0a12; bottom: max(56px, calc(env(safe-area-inset-bottom, 0px) + 38px)); }
+
+/* ----- Multi-photo hero ----- */
+.card .hero.multi { display: grid; grid-template-columns: 1fr 34%; gap: 4px; aspect-ratio: auto; height: 220px; background: var(--bg); }
+.card .hero .banner, .card .hero .more { display: block; padding: 0; border: 0; background: var(--panel-2); cursor: pointer; overflow: hidden; position: relative; min-width: 0; }
+.card .hero .banner img, .card .hero .more img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.25s ease; }
+.card .hero:not(.multi) .banner { width: 100%; height: 100%; }
+.card .hero .banner:hover img, .card .hero .more:hover img { transform: scale(1.04); }
+.card .hero .more img { filter: brightness(0.55); }
+.card .hero .more-label {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  color: #fff; font-family: var(--font-ui); font-weight: 700; font-size: 18px; letter-spacing: 1px; text-shadow: 0 1px 4px #000;
+}
+.card .hero .more:hover .more-label { color: var(--pink); }
+@media (max-width: 760px) { .card .hero.multi { height: 170px; } }
+@media (prefers-reduced-motion: reduce) { .card .hero img { transition: none; } }
+
+/* Gallery lightbox */
+.gallery {
+  position: fixed; inset: 0; z-index: 50; background: rgba(7, 5, 16, 0.94);
+  display: grid; grid-template-rows: 1fr auto; place-items: center; padding: 16px; gap: 10px;
+  padding-top: max(16px, env(safe-area-inset-top, 0px)); padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+}
+.g-main { max-width: 100%; max-height: calc(100vh - 140px); object-fit: contain; border-radius: 4px; box-shadow: var(--shadow); }
+.g-close { position: absolute; top: max(12px, env(safe-area-inset-top, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); color: #fff; font-size: 22px; cursor: pointer; }
+.g-count { position: absolute; top: max(20px, calc(env(safe-area-inset-top, 0px) + 8px)); left: 50%; transform: translateX(-50%); font-family: var(--font-ui); letter-spacing: 2px; color: var(--muted); font-size: 13px; }
+.g-arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 64px; border: 0; border-radius: 6px; background: rgba(26, 20, 52, 0.8); color: #fff; font-size: 34px; cursor: pointer; }
+.g-arrow.left { left: max(8px, env(safe-area-inset-left, 0px)); }
+.g-arrow.right { right: max(8px, env(safe-area-inset-right, 0px)); }
+.g-arrow:hover { background: var(--magenta); }
+.g-strip { display: flex; gap: 6px; max-width: 100%; overflow-x: auto; padding: 2px; }
+.g-strip button { flex: none; width: 64px; height: 48px; padding: 0; border: 2px solid transparent; border-radius: 4px; overflow: hidden; background: var(--panel-2); cursor: pointer; opacity: 0.6; }
+.g-strip button img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.g-strip button.on { border-color: var(--pink); opacity: 1; }
+
+/* Form: extra photos */
+.extras { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.extra { position: relative; width: 84px; height: 64px; border-radius: var(--radius); overflow: hidden; background: var(--panel-2); border: 1px solid var(--line); }
+.extra img { width: 100%; height: 100%; object-fit: cover; }
+.extra button { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%; border: 0; background: rgba(18, 13, 38, 0.9); color: #fff; font-size: 14px; line-height: 1; cursor: pointer; }
+.extra.add { display: grid; place-items: center; cursor: pointer; color: var(--muted); font-size: 26px; border-style: dashed; }
+.extra.add:hover { color: var(--fg); border-color: var(--muted); }
+#f-extra-url { width: 100%; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); color: var(--fg); }

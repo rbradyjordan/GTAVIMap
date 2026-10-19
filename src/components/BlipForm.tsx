@@ -27,6 +27,21 @@ export default function BlipForm({ initial, isNew, onSave, onCancel }: Props) {
     }
   }
 
+  const extras = b.images ?? [];
+  const setExtras = (list: string[]) => set("images", list.filter(Boolean));
+
+  async function onExtraFiles(files?: FileList | null) {
+    if (!files?.length) return;
+    try {
+      const added: string[] = [];
+      for (const f of Array.from(files)) added.push(await fileToDataUrl(f));
+      setExtras([...extras, ...added]);
+      setErr("");
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  }
+
   return (
     <div className="scrim" onMouseDown={(e) => e.target === e.currentTarget && onCancel()}>
       <form
@@ -112,6 +127,31 @@ export default function BlipForm({ initial, isNew, onSave, onCancel }: Props) {
               </div>
             </div>
           </div>
+        </div>
+        <div className="field">
+          <label>More photos</label>
+          <div className="extras">
+            {extras.map((src, i) => (
+              <div className="extra" key={i}>
+                <img src={src} alt="" />
+                <button type="button" aria-label="Remove photo" onClick={() => setExtras(extras.filter((_, k) => k !== i))}>×</button>
+              </div>
+            ))}
+            <label className="extra add" htmlFor="f-extra-files" title="Upload photos">+</label>
+            <input id="f-extra-files" type="file" accept="image/*" multiple hidden onChange={(e) => { onExtraFiles(e.target.files); e.target.value = ""; }} />
+          </div>
+          <input
+            id="f-extra-url"
+            placeholder="Or paste an image URL and press Enter"
+            onKeyDown={(e) => {
+              const v = (e.target as HTMLInputElement).value.trim();
+              if (e.key === "Enter" && v) {
+                e.preventDefault();
+                setExtras([...extras, v]);
+                (e.target as HTMLInputElement).value = "";
+              }
+            }}
+          />
         </div>
         <div className="field">
           <label htmlFor="f-notes">Shoot notes</label>
