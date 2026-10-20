@@ -1,15 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Blip, Category } from "@/data/blips";
-import { newId, useBlips, useEditor } from "@/lib/store";
+import { newId, useBlips, useEditor, useVisited } from "@/lib/store";
 import { checkSetup, loadMapKit, SetupProblem } from "@/lib/mapkit";
 import SetupGate from "./SetupGate";
 import Sidebar, { FoundPlace } from "./Sidebar";
 import BlipCard from "./BlipCard";
 import BlipForm from "./BlipForm";
-import MapView from "./MapView";
+import MapView, { FlyTo } from "./MapView";
 import UnlockDialog from "./UnlockDialog";
+import LoadingScreen from "./LoadingScreen";
+
+const TOUR_STEP_MS = 5500;
 
 export default function BlipSix() {
   const [mk, setMk] = useState<typeof mapkit | null>(null);
@@ -47,14 +50,22 @@ export default function BlipSix() {
       </div>
     );
   }
-  if (!mk) return <div className="app" />;
+  if (!mk) {
+    return (
+      <div className="app">
+        <LoadingScreen ready={false} />
+      </div>
+    );
+  }
   return <Inner mk={mk} />;
 }
 
 function Inner({ mk }: { mk: typeof mapkit }) {
   const { editor, unlock, lock } = useEditor();
-  const { blips, upsert, remove, reset, save, saveError } = useBlips(editor);
+  const { blips, loaded, upsert, remove, reset, save, saveError } = useBlips(editor);
+  const { visited, toggle: toggleVisited } = useVisited();
   const [unlocking, setUnlocking] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ blip: Blip; isNew: boolean } | null>(null);
@@ -63,21 +74,98 @@ function Inner({ mk }: { mk: typeof mapkit }) {
   const [dropMode, setDropMode] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
   const [toast, setToast] = useState("");
-  const [flyTo, setFlyTo] = useState<{ lat: number; lng: number; n: number } | null>(null);
+  const [flyTo, setFlyTo] = useState<FlyTo | null>(null);
+  const [touring, setTouring] = useState(false);
+  const tourIdx = useRef(0);
 
   const selected = useMemo(() => blips.find((b) => b.id === selectedId) ?? null, [blips, selectedId]);
   const shown = useMemo(() => blips.filter((b) => cats.has(b.cat)), [blips, cats]);
+  const areas = useMemo(() => {
+    const counts = new globalThis.Map<string, number>();
+    blips.forEach((b) => counts.set(b.area, (counts.get(b.area) ?? 0) + 1));
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([a]) => a);
+  }, [blips]);
 
   const say = useCallback((t: string) => {
     setToast(t);
     window.setTimeout(() => setToast(""), 2200);
   }, []);
 
-  const select = useCallback((b: Blip) => {
-    setSelectedId(b.id);
-    if (window.matchMedia("(max-width: 760px)").matches) setPanelOpen(false);
-    setFlyTo((f) => ({ lat: b.lat, lng: b.lng, n: (f?.n ?? 0) + 1 }));
+  const fly = useCallback((lat: number, lng: number, span?: number) => {
+    setFlyTo((f) => ({ lat, lng, span, n: (f?.n ?? 0) + 1 }));
   }, []);
+
+  const isPhone = () => window.matchMedia("(max-width: 760px)").matches;
+
+  const select = useCallback(
+    (b: Blip) => {
+      setSelectedId(b.id);
+      if (isPhone()) setPanelOpen(false);
+      fly(b.lat, b.lng);
+    },
+    [fly],
+  );
+
+  // Jump to a neighborhood: fit the map to every blip in it.
+  function jumpToArea(area: string) {
+    const list = blips.filter((b) => b.area === area);
+    if (!list.length) return;
+    const lats = list.map((b) => b.lat);
+    const lngs = list.map((b) => b.lng);
+    const lat = (Math.min(...lats) + Math.max(...lats)) / 2;
+    const lng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+    const span = Math.max(0.02, (Math.max(...lats) - Math.min(...lats)) * 1.8, (Math.max(...lngs) - Math.min(...lngs)) * 1.8);
+    setSelectedId(null);
+    fly(lat, lng, span);
+    if (isPhone()) setPanelOpen(false);
+  }
+
+  function surprise() {
+    const pool = shown.filter((b) => b.id !== selectedId);
+    if (!pool.length) return;
+    const b = pool[Math.floor(Math.random() * pool.length)];
+    select(b);
+    say(`Rolled: ${b.name}`);
+  }
+
+  // Tour: step through the live spots.
+  const tourList = useMemo(() => blips.filter((b) => b.cat === "confirmed"), [blips]);
+  useEffect(() => {
+    if (!touring || !tourList.length) return;
+    const step = () => {
+      const b = tourList[tourIdx.current % tourList.length];
+      tourIdx.current += 1;
+      select(b);
+    };
+    step();
+    const t = window.setInterval(step, TOUR_STEP_MS);
+    return () => window.clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [touring, tourList]);
+
+  // Keyboard: arrows hop through the visible list, T toggles the tour, Esc closes.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      if (editing || unlocking) return;
+      if (document.querySelector(".gallery")) return;
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        if (!shown.length) return;
+        e.preventDefault();
+        const i = shown.findIndex((b) => b.id === selectedId);
+        const next = e.key === "ArrowRight" ? (i + 1) % shown.length : (i - 1 + shown.length) % shown.length;
+        select(shown[next]);
+      } else if (e.key.toLowerCase() === "t") {
+        setTouring((v) => !v);
+      } else if (e.key === "Escape") {
+        setSelectedId(null);
+        setTouring(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [shown, selectedId, select, editing, unlocking]);
 
   const blank = (lat: number, lng: number): Blip => ({
     id: newId(),
@@ -95,9 +183,9 @@ function Inner({ mk }: { mk: typeof mapkit }) {
     b.name = place.name;
     b.address = place.address;
     b.link = place.url ?? "";
-    setFlyTo((f) => ({ lat: b.lat, lng: b.lng, n: (f?.n ?? 0) + 1 }));
+    fly(b.lat, b.lng);
     setEditing({ blip: b, isNew: true });
-    if (window.matchMedia("(max-width: 760px)").matches) setPanelOpen(false);
+    if (isPhone()) setPanelOpen(false);
   }
 
   function onBackgroundTap(lat: number, lng: number) {
@@ -148,15 +236,18 @@ function Inner({ mk }: { mk: typeof mapkit }) {
         mk={mk}
         blips={shown}
         selectedId={selectedId}
+        visited={visited}
         dropMode={dropMode}
         onSelect={(id) => {
           const b = blips.find((x) => x.id === id);
           if (b) {
             setSelectedId(id);
-            if (window.matchMedia("(max-width: 760px)").matches) setPanelOpen(false);
+            setTouring(false);
+            if (isPhone()) setPanelOpen(false);
           }
         }}
         onBackgroundTap={onBackgroundTap}
+        onReady={() => setMapReady(true)}
         flyTo={flyTo}
       />
       <div className="tint" aria-hidden="true" />
@@ -169,6 +260,11 @@ function Inner({ mk }: { mk: typeof mapkit }) {
       </div>
 
       {dropMode && <div className="dropmode">Tap the map where the blip goes</div>}
+      {touring && (
+        <div className="dropmode tour">
+          Touring the live spots · {Math.min(((tourIdx.current - 1) % Math.max(tourList.length, 1)) + 1, tourList.length)} / {tourList.length} · press T or Esc to stop
+        </div>
+      )}
 
       <Sidebar
         mk={mk}
@@ -185,7 +281,10 @@ function Inner({ mk }: { mk: typeof mapkit }) {
           })
         }
         selectedId={selectedId}
-        onSelect={select}
+        onSelect={(b) => {
+          setTouring(false);
+          select(b);
+        }}
         onPlace={onPlace}
         dropMode={dropMode}
         onDropMode={() => setDropMode((d) => !d)}
@@ -205,6 +304,15 @@ function Inner({ mk }: { mk: typeof mapkit }) {
           setDropMode(false);
           setEditing(null);
           say("Editing locked");
+        }}
+        visited={visited}
+        areas={areas}
+        onArea={jumpToArea}
+        onSurprise={surprise}
+        touring={touring}
+        onTour={() => {
+          tourIdx.current = 0;
+          setTouring((v) => !v);
         }}
       />
 
@@ -226,6 +334,11 @@ function Inner({ mk }: { mk: typeof mapkit }) {
         <BlipCard
           blip={selected}
           editor={editor}
+          visited={visited.has(selected.id)}
+          onToggleVisited={() => {
+            toggleVisited(selected.id);
+            say(visited.has(selected.id) ? "Unmarked" : `Hit: ${selected.name}`);
+          }}
           onClose={() => setSelectedId(null)}
           onEdit={() => setEditing({ blip: selected, isNew: false })}
           onDelete={() => {
@@ -253,6 +366,7 @@ function Inner({ mk }: { mk: typeof mapkit }) {
       )}
 
       {toast && <div className="toast">{toast}</div>}
+      <LoadingScreen ready={mapReady && loaded} />
     </div>
   );
 }

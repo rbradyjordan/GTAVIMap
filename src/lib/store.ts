@@ -101,6 +101,33 @@ export function useEditor() {
   return { editor, configured, ready, unlock, lock };
 }
 
+/** Per-browser checklist of spots the viewer has been to. */
+export function useVisited() {
+  const KEY = "blipvi.visited.v1";
+  const [visited, setVisited] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    try {
+      setVisited(new Set(JSON.parse(localStorage.getItem(KEY) ?? "[]") as string[]));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const toggle = useCallback((id: string) => {
+    setVisited((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      try {
+        localStorage.setItem(KEY, JSON.stringify([...next]));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
+  return { visited, toggle };
+}
+
 export function newId() {
   return "b" + Math.random().toString(36).slice(2, 9);
 }

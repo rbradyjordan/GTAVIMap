@@ -10,9 +10,11 @@ type Props = {
   onEdit: () => void;
   onDelete: () => void;
   editor: boolean;
+  visited: boolean;
+  onToggleVisited: () => void;
 };
 
-export default function BlipCard({ blip, onClose, onEdit, onDelete, editor }: Props) {
+export default function BlipCard({ blip, onClose, onEdit, onDelete, editor, visited, onToggleVisited }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [gallery, setGallery] = useState<number | null>(null);
   const cat = CATEGORIES[blip.cat];
@@ -96,6 +98,9 @@ export default function BlipCard({ blip, onClose, onEdit, onDelete, editor }: Pr
           </dl>
           {blip.notes && <div className="notes">{blip.notes}</div>}
           <div className="actions">
+            <button className={`btn small visit${visited ? " on" : ""}`} aria-pressed={visited} onClick={onToggleVisited}>
+              {visited ? "✓ Visited" : "Mark visited"}
+            </button>
             <a className="btn small" href={dirUrl} target="_blank" rel="noreferrer">
               Directions
             </a>

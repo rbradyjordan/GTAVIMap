@@ -3,15 +3,18 @@
 import { useEffect, useRef } from "react";
 import { Blip, CATEGORIES, MIAMI_CENTER } from "@/data/blips";
 
+export type FlyTo = { lat: number; lng: number; span?: number; n: number };
+
 type Props = {
   mk: typeof mapkit;
   blips: Blip[];
   selectedId: string | null;
+  visited: Set<string>;
   dropMode: boolean;
   onSelect: (id: string) => void;
   onBackgroundTap: (lat: number, lng: number) => void;
-  /** Bumped whenever the caller wants the map to fly to the selected blip */
-  flyTo: { lat: number; lng: number; n: number } | null;
+  onReady: () => void;
+  flyTo: FlyTo | null;
 };
 
 const ICON: Record<Blip["cat"], string> = {
@@ -20,12 +23,13 @@ const ICON: Record<Blip["cat"], string> = {
   mine: "+",
 };
 
-export default function MapView({ mk, blips, selectedId, dropMode, onSelect, onBackgroundTap, flyTo }: Props) {
+export default function MapView({ mk, blips, selectedId, visited, dropMode, onSelect, onBackgroundTap, onReady, flyTo }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const map = useRef<mapkit.Map | null>(null);
   const anns = useRef(new globalThis.Map<string, { ann: mapkit.Annotation; el: HTMLElement; blip: Blip }>());
-  const cb = useRef({ onSelect, onBackgroundTap, dropMode });
-  cb.current = { onSelect, onBackgroundTap, dropMode };
+  const cb = useRef({ onSelect, onBackgroundTap, onReady, dropMode });
+  cb.current = { onSelect, onBackgroundTap, onReady, dropMode };
+  const dropped = useRef(0);
 
   // Create the map once.
   useEffect(() => {
@@ -55,8 +59,18 @@ export default function MapView({ mk, blips, selectedId, dropMode, onSelect, onB
       const c = m.convertPointOnPageToCoordinate(ev.pointOnPage);
       cb.current.onBackgroundTap(c.latitude, c.longitude);
     });
+    // Tiles don't announce themselves; the first region settle is close enough.
+    let readyFired = false;
+    const fireReady = () => {
+      if (readyFired) return;
+      readyFired = true;
+      cb.current.onReady();
+    };
+    m.addEventListener("region-change-end", fireReady);
+    const fallback = window.setTimeout(fireReady, 2500);
     map.current = m;
     return () => {
+      window.clearTimeout(fallback);
       m.destroy();
       map.current = null;
       anns.current.clear();
@@ -74,6 +88,7 @@ export default function MapView({ mk, blips, selectedId, dropMode, onSelect, onB
         anns.current.delete(id);
       }
     }
+    let i = 0;
     for (const b of blips) {
       const have = anns.current.get(b.id);
       if (have && have.blip.lat === b.lat && have.blip.lng === b.lng && have.blip.cat === b.cat && have.blip.name === b.name) continue;
@@ -82,13 +97,18 @@ export default function MapView({ mk, blips, selectedId, dropMode, onSelect, onB
         anns.current.delete(b.id);
       }
       let el: HTMLElement | null = null;
+      const delay = Math.min(i++ * 70, 1600) + (dropped.current === 0 ? 300 : 0);
       const ann = new mk.Annotation(
         new mk.Coordinate(b.lat, b.lng),
         () => {
           el = document.createElement("div");
-          el.className = `blip-pin cat-${b.cat}`;
+          el.className = `blip-pin cat-${b.cat} drop`;
           el.style.setProperty("--c", CATEGORIES[b.cat].color);
+          el.style.animationDelay = `${delay}ms`;
           el.innerHTML = `<span class="glyph">${ICON[b.cat]}</span><span class="label">${escapeHtml(b.name)}</span>`;
+          el.addEventListener("animationend", () => el?.classList.remove("drop"), { once: true });
+          // Off-screen annotations never animate; make sure they still end up visible.
+          window.setTimeout(() => el?.classList.remove("drop"), delay + 1500);
           return el;
         },
         {
@@ -103,19 +123,21 @@ export default function MapView({ mk, blips, selectedId, dropMode, onSelect, onB
       m.addAnnotation(ann);
       anns.current.set(b.id, { ann, el: el!, blip: b });
     }
+    dropped.current += 1;
   }, [mk, blips]);
 
-  // Selected styling.
+  // Selected + visited styling.
   useEffect(() => {
     for (const [id, a] of anns.current) {
       a.el?.classList.toggle("selected", id === selectedId);
+      a.el?.classList.toggle("visited", visited.has(id));
     }
-  }, [selectedId, blips]);
+  }, [selectedId, visited, blips]);
 
   useEffect(() => {
     if (!map.current || !flyTo) return;
     const m = map.current;
-    const span = Math.min(m.region.span.latitudeDelta, 0.03);
+    const span = flyTo.span ?? Math.min(m.region.span.latitudeDelta, 0.03);
     m.setRegionAnimated(
       new mk.CoordinateRegion(new mk.Coordinate(flyTo.lat, flyTo.lng), new mk.CoordinateSpan(span, span)),
       true,

@@ -31,6 +31,12 @@ type Props = {
   editor: boolean;
   onUnlock: () => void;
   onLock: () => void;
+  visited: Set<string>;
+  areas: string[];
+  onArea: (area: string) => void;
+  onSurprise: () => void;
+  touring: boolean;
+  onTour: () => void;
 };
 
 const ORDER: Category[] = ["confirmed", "game", "mine"];
@@ -90,6 +96,9 @@ export default function Sidebar(p: Props) {
     .sort((a, b) => ORDER.indexOf(a.cat) - ORDER.indexOf(b.cat) || a.area.localeCompare(b.area));
 
   const counts = p.blips.reduce<Record<string, number>>((m, b) => ((m[b.cat] = (m[b.cat] ?? 0) + 1), m), {});
+  const live = p.blips.filter((b) => b.cat === "confirmed");
+  const liveTotal = live.length;
+  const liveHit = live.filter((b) => p.visited.has(b.id)).length;
 
   return (
     <nav className="panel" data-open={p.open} aria-label="Blips">
@@ -154,6 +163,24 @@ export default function Sidebar(p: Props) {
             </button>
           ))}
         </div>
+        <div className="hitlist" title="Spots you've marked visited (saved in this browser)">
+          <div className="hitlist-row">
+            <span className="eyebrow">Hit list</span>
+            <span className="hitlist-n">{liveHit} / {liveTotal} live</span>
+          </div>
+          <div className="hitlist-bar"><span style={{ width: `${liveTotal ? (liveHit / liveTotal) * 100 : 0}%` }} /></div>
+        </div>
+        <div className="fun">
+          <button className="btn small" onClick={p.onSurprise} title="Fly to a random blip">🎲 Surprise me</button>
+          <button className="btn small" aria-pressed={p.touring} onClick={p.onTour} title="Auto-play through the live spots (T)">
+            {p.touring ? "■ Stop tour" : "▶ Tour"}
+          </button>
+        </div>
+        <div className="areas" role="group" aria-label="Jump to an area">
+          {p.areas.map((a) => (
+            <button key={a} className="area-chip" onClick={() => p.onArea(a)}>{a}</button>
+          ))}
+        </div>
       </div>
 
       <div className="list">
@@ -164,9 +191,10 @@ export default function Sidebar(p: Props) {
             className="row"
             style={{ ["--c" as string]: CATEGORIES[b.cat].color }}
             aria-current={p.selectedId === b.id}
+            data-visited={p.visited.has(b.id)}
             onClick={() => p.onSelect(b)}
           >
-            <span className="blip" />
+            <span className="blip">{p.visited.has(b.id) ? "✓" : ""}</span>
             <span className="name">
               {b.name}
               <span className="sub">{b.gameName ? `as ${b.gameName}` : b.dates ?? CATEGORIES[b.cat].label}</span>
