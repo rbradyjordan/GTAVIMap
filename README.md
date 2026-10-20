@@ -24,7 +24,11 @@ npm run dev                        # http://localhost:3000
 ## Where things live
 
 - `src/data/blips.ts`: the starting set of pins, with photo credits.
-- `data/blips.json`: the live set once the editor saves anything. Export
+- The live set once the editor saves anything (`src/lib/pinStore.ts`): on
+  Vercel, the `gtavimap-blips` Blob store, one `blips/<time>.json` per save
+  (the last 10 are kept as history), with uploaded photos as `photos/*` blobs.
+  Locally, `data/blips.json` with photos inline (`BLIPS_STORE=blob` uses the
+  Blob store from `BLOB_READ_WRITE_TOKEN` instead, i.e. the live pins). Export
   writes a copy; Import merges one back; Reset restores the starting set.
 - `public/photos/`: Brady's own photos (the Panther Coffee mural).
 - Other photos are hotlinked from Wikimedia Commons and Unsplash; each pin

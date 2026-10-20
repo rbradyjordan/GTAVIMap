@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Blip, CATEGORIES, Category } from "@/data/blips";
-import { fileToDataUrl } from "@/lib/store";
+import { uploadPhoto } from "@/lib/store";
 
 type Props = {
   initial: Blip;
@@ -19,7 +19,7 @@ export default function BlipForm({ initial, isNew, onSave, onCancel }: Props) {
   async function onFile(file?: File) {
     if (!file) return;
     try {
-      set("image", await fileToDataUrl(file));
+      set("image", await uploadPhoto(file));
       set("imageCredit", "");
       setErr("");
     } catch (e) {
@@ -34,7 +34,7 @@ export default function BlipForm({ initial, isNew, onSave, onCancel }: Props) {
     if (!files?.length) return;
     try {
       const added: string[] = [];
-      for (const f of Array.from(files)) added.push(await fileToDataUrl(f));
+      for (const f of Array.from(files)) added.push(await uploadPhoto(f));
       setExtras([...extras, ...added]);
       setErr("");
     } catch (e) {

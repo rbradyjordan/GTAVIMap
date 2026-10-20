@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Blip, DEFAULT_BLIPS } from "@/data/blips";
 
 /**
- * Pins live on the server (data/blips.json). Everyone reads them; only a browser
- * that has unlocked editing can write them. Writes are optimistic and queued.
+ * Pins live on the server (Vercel Blob in production, data/blips.json locally). Everyone
+ * reads them; only a browser that has unlocked editing can write them. Writes are
+ * optimistic and queued.
  */
 export function useBlips(editor: boolean) {
   const [blips, setBlips] = useState<Blip[]>(DEFAULT_BLIPS);
@@ -32,13 +33,22 @@ export function useBlips(editor: boolean) {
       if (!editor) return;
       window.clearTimeout(timer.current);
       timer.current = window.setTimeout(async () => {
+        const sent = latest.current;
         try {
           const r = await fetch("/api/blips", {
             method: "PUT",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify(latest.current),
+            body: JSON.stringify(sent),
           });
-          if (!r.ok) throw new Error(((await r.json()) as { error?: string }).error ?? `save ${r.status}`);
+          const j = (await r.json().catch(() => ({}))) as { error?: string; blips?: Blip[] };
+          if (!r.ok) throw new Error(j.error ?? `save ${r.status}`);
+          // The server moves inline photos to storage; swap in their URLs so they upload once.
+          const moved = photoSwaps(sent, j.blips ?? []);
+          if (moved.size) {
+            const swap = (p?: string) => (p && moved.get(p)) || p;
+            latest.current = latest.current.map((b) => ({ ...b, image: swap(b.image), images: b.images?.map((p) => swap(p) ?? p) }));
+            setBlips(latest.current);
+          }
           setSaveError("");
         } catch (e) {
           setSaveError((e as Error).message);
@@ -61,6 +71,19 @@ export function useBlips(editor: boolean) {
   const reset = useCallback(() => persist(DEFAULT_BLIPS), [persist]);
 
   return { blips, loaded, saveError, save: persist, upsert, remove, reset };
+}
+
+/** Data-URL photos in `sent` that came back as stored URLs, keyed by the data URL. */
+function photoSwaps(sent: Blip[], stored: Blip[]): Map<string, string> {
+  const out = new Map<string, string>();
+  const byId = new Map(stored.map((b) => [b.id, b]));
+  for (const b of sent) {
+    const s = byId.get(b.id);
+    if (!s) continue;
+    const pairs: [string | undefined, string | undefined][] = [[b.image, s.image], ...(b.images ?? []).map((p, i) => [p, s.images?.[i]] as [string, string | undefined])];
+    for (const [from, to] of pairs) if (from?.startsWith("data:") && to && to !== from) out.set(from, to);
+  }
+  return out;
 }
 
 export function useEditor() {
@@ -130,6 +153,19 @@ export function useVisited() {
 
 export function newId() {
   return "b" + Math.random().toString(36).slice(2, 9);
+}
+
+/** Shrinks a photo and uploads it; returns the URL to keep on the pin (a data URL in local dev). */
+export async function uploadPhoto(file: File): Promise<string> {
+  const dataUrl = await fileToDataUrl(file);
+  const r = await fetch("/api/photos", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ dataUrl }),
+  });
+  const j = (await r.json().catch(() => ({}))) as { url?: string; error?: string };
+  if (!r.ok || !j.url) throw new Error(j.error ?? "Could not upload the photo");
+  return j.url;
 }
 
 /** Shrink an uploaded image to a data URL that stays small in the JSON store. */
