@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { Blip, CATEGORIES, MIAMI_CENTER } from "@/data/blips";
+import { FxState, startMapFx } from "@/lib/mapFx";
 
 export type FlyTo = { lat: number; lng: number; span?: number; n: number };
 
@@ -10,6 +11,7 @@ type Props = {
   blips: Blip[];
   selectedId: string | null;
   visited: Set<string>;
+  touring: boolean;
   dropMode: boolean;
   onSelect: (id: string) => void;
   onBackgroundTap: (lat: number, lng: number) => void;
@@ -23,13 +25,15 @@ const ICON: Record<Blip["cat"], string> = {
   mine: "+",
 };
 
-export default function MapView({ mk, blips, selectedId, visited, dropMode, onSelect, onBackgroundTap, onReady, flyTo }: Props) {
+export default function MapView({ mk, blips, selectedId, visited, touring, dropMode, onSelect, onBackgroundTap, onReady, flyTo }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const map = useRef<mapkit.Map | null>(null);
   const anns = useRef(new globalThis.Map<string, { ann: mapkit.Annotation; el: HTMLElement; blip: Blip }>());
   const cb = useRef({ onSelect, onBackgroundTap, onReady, dropMode });
   cb.current = { onSelect, onBackgroundTap, onReady, dropMode };
   const dropped = useRef(0);
+  const fx = useRef<FxState>({ blips, selectedId, touring });
+  fx.current = { blips, selectedId, touring };
 
   // Create the map once.
   useEffect(() => {
@@ -69,7 +73,18 @@ export default function MapView({ mk, blips, selectedId, visited, dropMode, onSe
     m.addEventListener("region-change-end", fireReady);
     const fallback = window.setTimeout(fireReady, 2500);
     map.current = m;
+    // MapKit builds its DOM a tick after construction; attach the FX layer once the tile canvas exists.
+    let stopFx: (() => void) | null = null;
+    const attach = window.setInterval(() => {
+      const view = host.current?.querySelector(".mk-map-view") as HTMLElement | null;
+      if (view?.querySelector("canvas.rt-root")) {
+        window.clearInterval(attach);
+        stopFx = startMapFx(mk, m, view, () => fx.current);
+      }
+    }, 100);
     return () => {
+      window.clearInterval(attach);
+      stopFx?.();
       window.clearTimeout(fallback);
       m.destroy();
       map.current = null;

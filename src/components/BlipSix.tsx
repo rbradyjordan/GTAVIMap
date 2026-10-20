@@ -237,6 +237,7 @@ function Inner({ mk }: { mk: typeof mapkit }) {
         blips={shown}
         selectedId={selectedId}
         visited={visited}
+        touring={touring}
         dropMode={dropMode}
         onSelect={(id) => {
           const b = blips.find((x) => x.id === id);
