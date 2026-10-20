@@ -256,7 +256,7 @@ function Inner({ mk }: { mk: typeof mapkit }) {
         <h1>
           Blip <span className="six">VI</span>
         </h1>
-        <span className="tag">Magic City · launch week</span>
+        <span className="tag">Vice City · launch week</span>
       </div>
 
       {dropMode && <div className="dropmode">Tap the map where the blip goes</div>}

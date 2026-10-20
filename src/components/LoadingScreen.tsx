@@ -50,11 +50,11 @@ export default function LoadingScreen({ ready }: { ready: boolean }) {
         <div className="loading-logo">
           Blip <span className="six">VI</span>
         </div>
-        <div className="loading-sub">Magic City · launch week</div>
+        <div className="loading-sub">Vice City · launch week</div>
         <div className="loading-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}>
           <span style={{ width: `${progress}%` }} />
         </div>
-        <div className="loading-status">{ready ? "Welcome to the Magic City" : "Loading the Magic City…"}</div>
+        <div className="loading-status">{ready ? "Welcome to Vice City" : "Loading Vice City…"}</div>
         <div className="loading-tip" key={tip}>{TIPS[tip]}</div>
       </div>
     </div>

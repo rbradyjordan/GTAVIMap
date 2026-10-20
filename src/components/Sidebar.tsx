@@ -106,7 +106,7 @@ export default function Sidebar(p: Props) {
         {p.open ? "Hide list" : `${visible.length} blips · show list`}
       </button>
       <div className="panel-head">
-        <div className="eyebrow">Launch-week dossier · Magic City</div>
+        <div className="eyebrow">Launch-week dossier · Vice City</div>
         {p.editor && (
         <div className="search">
           <div className="ac">

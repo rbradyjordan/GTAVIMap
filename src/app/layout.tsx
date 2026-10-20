@@ -10,7 +10,7 @@ const pricedown = localFont({
 
 export const metadata: Metadata = {
   title: "Blip VI",
-  description: "A Magic City map of every launch-week spot worth a pin, Brickell to South Beach.",
+  description: "A Vice City map of every launch-week spot worth a pin, Brickell to South Beach.",
 };
 
 export const viewport: Viewport = {
